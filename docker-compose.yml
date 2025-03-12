@@ -1,0 +1,329 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: customer_churn
+      MYSQL_USER: etl_user
+      MYSQL_PASSWORD: etl_user123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - airflow-net
+
+  airflow:
+    image: airflow
+    container_name: airflow
+    build:
+      context: airflow
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "9090:9090"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor #Use LocalExecutor for standalone mode doesn't need worker
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - AIRFLOW__WEBSERVER__PORT=9090
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+          cpus: "2.0"
+        reservations:
+          memory: 2G
+          cpus: "1.0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./sparkjobs:/opt/sparkjobs
+      - ./jars:/opt/spark/jars
+      - ./data:/opt/data
+    entrypoint: >
+      /bin/bash -c "
+      airflow db init &&
+      airflow db upgrade &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+      airflow connections get spark_config || airflow connections add 'spark_config' --conn-type 'spark' --conn-host 'spark://spark' --conn-port '7077' &&
+      airflow scheduler & airflow webserver --port 9090 && airflow celery worker"
+    networks:
+      - airflow-net
+
+  spark:
+    image: bitnami/spark:latest
+    container_name: spark
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark
+      - JAVA_HOME=/opt/bitnami/java
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_MASTER_WEBUI_PORT=8081
+      - SPARK_LOG_LEVEL=DEBUG
+      - SPARK_CLASSPATH=/opt/spark/jars/mysql-connector-j-8.0.33.jar
+      - SPARK_MASTER_PORT=7077
+      - SPARK_LOCAL_IP=spark
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=6G
+      - SPARK_EXECUTOR_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=2G
+      - SPARK_EXECUTOR_CORES=2
+      - SPARK_EXECUTOR_INSTANCES=3
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "7077:7077"
+      - "4040:4040"
+      - "4041:4041"
+      - "5005:5005"
+    entrypoint: >
+      /bin/bash -c "
+        /opt/bitnami/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark --port 7077 --webui-port 8080 & 
+        sleep 5 && 
+        /opt/bitnami/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark:7077 --webui-port 8081 &
+        sleep infinity"
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+          cpus: "3.0"
+    volumes:
+      - ./sparkjobs:/opt/sparkjobs
+      - ./jars:/opt/spark/jars
+      - ./data:/opt/data
+    networks:
+      - airflow-net
+
+#  airflow-webserver:
+#    image: apache/airflow:2.6.2
+#    container_name: airflow-webserver
+#    build:
+#      context: airflow
+#      dockerfile: Dockerfile
+#    restart: always
+#    depends_on:
+#      - postgres
+#    ports:
+#      - "9090:8080"
+#    environment:
+#      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+#      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+#      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+#      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+#    volumes:
+#      - ./airflow/dags:/opt/airflow/dags
+#      - ./airflow/logs:/opt/airflow/logs
+#      - ./airflow/plugins:/opt/airflow/plugins
+#      - ./sparkjobs:/opt/sparkjobs
+#      - ./jars:/opt/spark/jars
+#      - ./data:/opt/data
+#    entrypoint: >
+#      /bin/bash -c "
+#      pip install --no-cache-dir apache-airflow-providers-apache-spark apache-airflow-providers-mysql apache-airflow-providers-redis apache-airflow-providers-celery pymysql pandas pyspark &&
+#      airflow db init &&
+#      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+#      airflow connections get spark_config || airflow connections add 'spark_config' --conn-type 'spark' --conn-host 'spark://spark-master' --conn-port '7077' &&
+#      airflow webserver"
+#    networks:
+#      - airflow-net
+#
+#  airflow-scheduler:
+#    image: apache/airflow:2.6.2
+#    container_name: airflow-scheduler
+#    build:
+#      context: airflow
+#      dockerfile: Dockerfile
+#    restart: always
+#    depends_on:
+#      - postgres
+#    environment:
+#      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+#      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+#      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+#      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+#    entrypoint: >
+#      /bin/bash -c "
+#      pip install --no-cache-dir apache-airflow-providers-apache-spark apache-airflow-providers-mysql apache-airflow-providers-redis apache-airflow-providers-celery pymysql pandas pyspark &&
+#      airflow connections get spark_config || airflow connections add 'spark_config' --conn-type 'spark' --conn-host 'spark://spark-master' --conn-port '7077' &&
+#      airflow scheduler"
+#    volumes:
+#      - ./airflow/dags:/opt/airflow/dags
+#      - ./airflow/logs:/opt/airflow/logs
+#      - ./airflow/plugins:/opt/airflow/plugins
+#      - ./sparkjobs:/opt/sparkjobs
+#      - ./jars:/opt/spark/jars
+#      - ./data:/opt/data
+#    networks:
+#      - airflow-net
+#
+#  airflow-worker:
+#    image: apache/airflow:2.6.2
+#    container_name: airflow-worker
+#    build:
+#      context: airflow
+#      dockerfile: Dockerfile
+#    restart: always
+#    depends_on:
+#      - airflow-webserver
+#    environment:
+#      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+#      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+#      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+#      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+#    deploy:
+#      resources:
+#        limits:
+#          memory: 4G
+#          cpus: "2.0"
+#        reservations:
+#          memory: 2G
+#          cpus: "1.0"
+#    entrypoint: >
+#      /bin/bash -c "
+#      pip install --no-cache-dir apache-airflow-providers-apache-spark apache-airflow-providers-mysql apache-airflow-providers-redis apache-airflow-providers-celery pymysql pandas pyspark &&
+#      airflow celery worker"
+#    volumes:
+#      - ./airflow/dags:/opt/airflow/dags
+#      - ./airflow/logs:/opt/airflow/logs
+#      - ./airflow/plugins:/opt/airflow/plugins
+#      - ./sparkjobs:/opt/sparkjobs
+#      - ./jars:/opt/spark/jars
+#      - ./data:/opt/data
+#    networks:
+#      - airflow-net
+
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5432:5432"
+    networks:
+      - airflow-net
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - airflow-net
+
+#  spark-master:
+#    image: bitnami/spark:latest
+#    container_name: spark-master
+#    environment:
+#      - SPARK_MODE=master
+#      - JAVA_HOME=/opt/bitnami/java
+#      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+#      - SPARK_RPC_ENCRYPTION_ENABLED=no
+#      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+#      - SPARK_SSL_ENABLED=no
+#      - SPARK_MASTER_WEBUI_PORT=8081
+#      - SPARK_LOG_LEVEL=DEBUG
+#      - SPARK_CLASSPATH=/opt/spark/jars/mysql-connector-j-8.0.33.jar
+#      - SPARK_MASTER_PORT=7077
+#    ports:
+#      - "8080:8080"
+#      - "7077:7077"
+#      - "5005:5005"
+#    volumes:
+#      - ./sparkjobs:/opt/sparkjobs
+#      - ./jars:/opt/spark/jars
+#      - ./data:/opt/data
+#    networks:
+#      - airflow-net
+#
+#  spark-worker:
+#    image: bitnami/spark:latest
+#    container_name: spark-worker
+#    environment:
+#      - SPARK_MODE=worker
+#      - SPARK_MASTER_URL=spark://spark-master:7077
+#      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+#      - SPARK_RPC_ENCRYPTION_ENABLED=no
+#      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+#      - SPARK_SSL_ENABLED=no
+#      - SPARK_CLASSPATH=/opt/spark/jars/mysql-connector-j-8.0.33.jar
+#      - SPARK_DYNAMIC_ALLOCATION_ENABLED=false
+#      - SPARK_WORKER_MEMORY=2G
+#      - SPARK_WORKER_CORES=1
+#      - SPARK_EXECUTOR_MEMORY=2G
+#      - SPARK_EXECUTOR_CORES=1
+#      - SPARK_DRIVER_MEMORY=2G
+#      - SPARK_EXECUTOR_INSTANCES=1
+#      - SPARK_DYNAMIC_ALLOCATION_ENABLED=false
+#      - SPARK_MASTER_PORT=7077
+#      - SPARK_WORKER_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006
+#    depends_on:
+#      - spark-master
+#    ports:
+#      - "8081:8081"
+#      - "7078:7078"
+#      - "7337:7337"
+#      - "5006:5006"
+#    volumes:
+#      - ./sparkjobs:/opt/sparkjobs
+#      - ./jars:/opt/spark/jars
+#      - ./data:/opt/data
+#    networks:
+#      - airflow-net
+#
+#  spark-driver:
+#    image: bitnami/spark:latest
+#    container_name: spark-driver
+#    depends_on:
+#      - spark-master
+#    environment:
+#      - SPARK_MASTER_URL=spark://spark-master:7077
+#      - SPARK_DRIVER_MEMORY=2G
+#      - SPARK_EXECUTOR_MEMORY=2G
+#      - SPARK_EXECUTOR_CORES=2
+#      - SPARK_DRIVER_PORT=4040
+#      - SPARK_DRIVER_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007
+#    ports:
+#      - "4040:4040"
+#      - "5007:5007"
+#    networks:
+#      - airflow-net
+
+#  streamlit:
+#    build:
+#      context: streamlit
+#      dockerfile: Dockerfile
+#    container_name: streamlit
+#    ports:
+#      - "8501:8501"
+#    depends_on:
+#      - spark-master
+#    environment:
+#      - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64
+#      - PATH=$JAVA_HOME/bin:$PATH
+#      - SPARK_CLASSPATH=/opt/spark/jars/mysql-connector-java-8.0.33.jar
+#    volumes:
+#      - ./streamlit:/opt/streamlit
+#      - ./jars:/opt/spark/jars
+#    networks:
+#      - airflow-net
+
+networks:
+  airflow-net:
+
+volumes:
+  mysql_data:
