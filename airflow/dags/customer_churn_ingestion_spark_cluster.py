@@ -9,8 +9,6 @@ default_args = {
 }
 
 JARS_PATH="/opt/spark/jars/mysql-connector-j-8.0.33.jar"
-SPARK_MASTER="spark://spark_master"
-SPARK_HOME="/opt/bitnami/spark"
 
 dag = DAG(
     "customer_churn_data_processing_spark_cluster",
@@ -51,5 +49,4 @@ customer_churn_aggregation_task = SparkSubmitOperator(
     dag=dag,
 )
 
-# Define task dependencies
 customer_churn_ingestion_task >> customer_churn_aggregation_task

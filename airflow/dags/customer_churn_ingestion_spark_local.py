@@ -9,10 +9,6 @@ default_args = {
     "retries": 0
 }
 
-JARS_PATH="/opt/spark/jars/mysql-connector-j-8.0.33.jar"
-SPARK_HOME="/opt/bitnami/spark"
-SPARK_SCRIPT="/opt/sparkjobs/customer_churn_ingestion_spark_local.py"
-
 dag = DAG(
     "customer_churn_data_processing_spark_local",
     default_args=default_args,
