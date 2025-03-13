@@ -25,17 +25,10 @@ customer_churn_ingestion_task = SparkSubmitOperator(
     conn_id='spark_config',
     verbose=True,
     application_args=[],
-    executor_cores=2,  #
-    executor_memory="2G",
-    driver_memory="2G",
-    num_executors=1,
     conf={
-        "spark.executor.instances": "3",
+        "spark.executor.instances": "2",
         "spark.executor.cores": "2",
-        "spark.driver.memory": "2G",
         "spark.executor.memory": "2G",
-        "spark.dynamicAllocation.enabled": "true",
-        "spark.dynamicAllocation.maxExecutors": "4",
         "spark.driver.extraClassPath": JARS_PATH,
         "spark.executor.extraClassPath": JARS_PATH
 },
@@ -48,17 +41,10 @@ customer_churn_aggregation_task = SparkSubmitOperator(
     conn_id='spark_config',
     verbose=True,
     application_args=[],
-    executor_cores=2,  #
-    executor_memory="2G",
-    driver_memory="2G",
-    num_executors=1,
     conf={
-            "spark.executor.instances": "3",
+            "spark.executor.instances": "2",
             "spark.executor.cores": "2",
-            "spark.driver.memory": "2G",
             "spark.executor.memory": "2G",
-            "spark.dynamicAllocation.enabled": "true",
-            "spark.dynamicAllocation.maxExecutors": "4",
             "spark.driver.extraClassPath": JARS_PATH,
             "spark.executor.extraClassPath": JARS_PATH
         },
