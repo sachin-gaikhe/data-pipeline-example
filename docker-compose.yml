@@ -74,12 +74,9 @@ services:
       - SPARK_CLASSPATH=/opt/spark/jars/mysql-connector-j-8.0.33.jar
       - SPARK_MASTER_PORT=7077
       - SPARK_LOCAL_IP=spark
-      - SPARK_WORKER_CORES=4
-      - SPARK_WORKER_MEMORY=6G
-      - SPARK_EXECUTOR_MEMORY=2G
-      - SPARK_DRIVER_MEMORY=2G
-      - SPARK_EXECUTOR_CORES=2
-      - SPARK_EXECUTOR_INSTANCES=3
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_INSTANCES=2
+      - SPARK_WORKER_MEMORY=5G
     ports:
       - "8080:8080"
       - "8081:8081"
