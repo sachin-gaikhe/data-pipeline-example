@@ -105,6 +105,7 @@ services:
     networks:
       - airflow-net
 
+### Below code can be uncommented to run separate airflow-webserver,airflow-scheduler and airflow worker
 #  airflow-webserver:
 #    image: apache/airflow:2.6.2
 #    container_name: airflow-webserver
@@ -225,6 +226,7 @@ services:
     networks:
       - airflow-net
 
+### Below code can be uncommented to run separate spark-master,spark-worker
 #  spark-master:
 #    image: bitnami/spark:latest
 #    container_name: spark-master
@@ -303,24 +305,24 @@ services:
 #    networks:
 #      - airflow-net
 
-#  streamlit:
-#    build:
-#      context: streamlit
-#      dockerfile: Dockerfile
-#    container_name: streamlit
-#    ports:
-#      - "8501:8501"
-#    depends_on:
-#      - spark-master
-#    environment:
-#      - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64
-#      - PATH=$JAVA_HOME/bin:$PATH
-#      - SPARK_CLASSPATH=/opt/spark/jars/mysql-connector-java-8.0.33.jar
-#    volumes:
-#      - ./streamlit:/opt/streamlit
-#      - ./jars:/opt/spark/jars
-#    networks:
-#      - airflow-net
+  streamlit:
+    build:
+      context: streamlit
+      dockerfile: Dockerfile
+    container_name: streamlit
+    ports:
+      - "8501:8501"
+    depends_on:
+      - spark
+    environment:
+      - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64
+      - PATH=$JAVA_HOME/bin:$PATH
+      - SPARK_CLASSPATH=/opt/spark/jars/mysql-connector-java-8.0.33.jar
+    volumes:
+      - ./streamlit:/opt/streamlit
+      - ./jars:/opt/spark/jars
+    networks:
+      - airflow-net
 
 networks:
   airflow-net:
