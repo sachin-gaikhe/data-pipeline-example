@@ -4,12 +4,12 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import when
 
 
-spark = (SparkSession.builder.appName("CustomerChurnDataAggregation")
-         .config("spark.jars","/opt/spark/jars/mysql-connector-j-8.0.33.jar")
-         .getOrCreate())
+def customer_data_aggregations(db_configs,database_type):
 
+    spark = (SparkSession.builder.appName("CustomerChurnDataAggregation")
+             .config("spark.jars", "/opt/spark/jars/mysql-connector-j-8.0.33.jar")
+             .getOrCreate())
 
-def customer_data_aggragations(db_configs,database_type):
     db_url = db_configs[database_type]["url"]
     db_properties = db_configs[database_type]["properties"]
 
@@ -73,7 +73,6 @@ def customer_data_aggragations(db_configs,database_type):
                                    properties=db_properties)
 
     print("All reports have been successfully generated and stored in MySQL.")
-
     spark.stop()
 
 db_configs = {
@@ -83,9 +82,8 @@ db_configs = {
         }
     }
 
-customer_data_aggragations(db_configs,"mysql")
+customer_data_aggregations(db_configs,"mysql")
 
-spark.stop()
 
 
 

@@ -1,12 +1,13 @@
 from pyspark.sql.functions import col, sha2,when
 from pyspark.sql import SparkSession
 
-spark = (SparkSession.builder.appName("CustomerChurnDataIngestion")
-         .config("spark.jars","/opt/spark/jars/mysql-connector-j-8.0.33.jar")
-         .getOrCreate())
-
 
 def customer_data_load(db_configs,database_type,input_file):
+
+    spark = (SparkSession.builder.appName("CustomerChurnDataIngestion")
+             .config("spark.jars", "/opt/spark/jars/mysql-connector-j-8.0.33.jar")
+             .getOrCreate())
+
     print("started job run...")
     db_url = db_configs[database_type]["url"]
     db_properties = db_configs[database_type]["properties"]
@@ -46,7 +47,9 @@ def customer_data_load(db_configs,database_type,input_file):
         chunk_no = chunk_no + 1
 
         print(f"Loaded data for chunk:= {chunk_no} with count:={df_chunk_data.count()}")
+
     print("Data Ingestion Completed!...")
+    spark.stop()
 
 db_configs = {
         "mysql": {
@@ -55,8 +58,6 @@ db_configs = {
         }
 }
 customer_data_load(db_configs,  "mysql", "/opt/data/customer_churn_data.csv")
-
-spark.stop()
 
 
 
